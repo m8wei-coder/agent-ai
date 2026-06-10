@@ -22,7 +22,23 @@ const ChatComponent = (props) => {
     // Clear the search input
     setSearchValue("");
     setIsLoading(true);
-    onStart(question); // 先放一条空气泡，后续逐 token 填充
+    onStart(question); // 先放一条空气泡，后续逐字填充
+
+    // 打字机效果：网络上 token 是一块块到的（一次蹦出整个词），
+    // 这里先入队，再用定时器按字符匀速吐出，跟到达节奏解耦，显示更平滑。
+    let queue = "";
+    let streamDone = false;
+    const timer = setInterval(() => {
+      if (queue.length > 0) {
+        // 积压越多每次吐越多个字符，避免落后网络太远
+        const step = Math.max(1, Math.ceil(queue.length / 30));
+        onDelta(queue.slice(0, step));
+        queue = queue.slice(step);
+      } else if (streamDone) {
+        clearInterval(timer);
+        setIsLoading(false);
+      }
+    }, 16);
 
     try {
       const response = await fetch(
@@ -44,15 +60,17 @@ const ChatComponent = (props) => {
           const line = evt.replace(/^data: /, "").trim();
           if (!line) continue;
           const data = JSON.parse(line);
-          if (data.delta) onDelta(data.delta);
+          if (data.delta) queue += data.delta; // 入队，交给定时器逐字吐出
           else if (data.error) onError(data.error);
         }
       }
     } catch (error) {
       console.error(`Error: ${error}`);
       onError(String(error));
+      queue = ""; // 出错就别再吐剩余字符了
     } finally {
-      setIsLoading(false);
+      // 标记流结束；定时器会把队列里剩余字符吐完后再清理、解除 loading
+      streamDone = true;
     }
   };
 
