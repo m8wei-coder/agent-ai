@@ -1,6 +1,8 @@
 import React from "react";
 import { Spin } from "antd";
 
+//TODO:对话内容的持久化
+
 const containerStyle = {
   display: "flex",
   justifyContent: "space-between",

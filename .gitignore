@@ -1,8 +1,13 @@
 # dependencies
 /node_modules
+/server/node_modules
 
 # production
 /build
+
+# uploaded files (keep only the default sample PDF referenced by the server)
+/server/uploads/*
+!/server/uploads/hbs-lean-startup.pdf
 
 # misc
 .DS_Store
@@ -11,6 +16,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.claude
 
 npm-debug.log*
 yarn-debug.log*
