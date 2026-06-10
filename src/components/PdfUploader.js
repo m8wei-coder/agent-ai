@@ -25,27 +25,29 @@ const uploadToBackend = async (file) => {
     }
 };
 
-const attributes = {
-    name: "file",
-    multiple: true,
-    //TODO: 同时上传多个文件
-    customRequest: async ({ file, onSuccess, onError }) => {
-        const response = await uploadToBackend(file);
-        if (response && response.status === 200) {
-            onSuccess(response.data);
-        } else {
-            onError(new Error("Upload failed"));
-        }
-    },
-    onChange(info) {
-        console.log(info);
-    },
-    onDrop(e) {
-        console.log("Dropped files", e.dataTransfer.files);
-    },
-};
+const PdfUploader = ({ onParseStart }) => {
+    const attributes = {
+        name: "file",
+        multiple: true,
+        //TODO: 同时上传多个文件
+        customRequest: async ({ file, onSuccess, onError }) => {
+            const response = await uploadToBackend(file);
+            if (response && response.status === 200) {
+                onSuccess(response.data);
+                // 上传成功后服务端开始后台解析，通知 App 启动状态轮询
+                onParseStart?.();
+            } else {
+                onError(new Error("Upload failed"));
+            }
+        },
+        onChange(info) {
+            console.log(info);
+        },
+        onDrop(e) {
+            console.log("Dropped files", e.dataTransfer.files);
+        },
+    };
 
-const PdfUploader = () => {
     return (
         <Dragger {...attributes}>
             <p className="ant-upload-drag-icon">

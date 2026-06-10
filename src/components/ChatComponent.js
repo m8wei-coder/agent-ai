@@ -17,6 +17,9 @@ const ChatComponent = (props) => {
   const [searchValue, setSearchValue] = useState("");
 
   const onSearch = async (question) => {
+    // 正在请求中或问题为空时直接忽略，防止反复点击/回车并发提交
+    if (isLoading || !question.trim()) return;
+
     // Clear the search input
     setSearchValue("");
     setIsLoading(true);

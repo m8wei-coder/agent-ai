@@ -9,6 +9,11 @@ import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 // 存的是 Promise，这样并发的首次请求也只会触发一次构建。
 const vectorStoreCache = new Map();
 
+// 记录每个文件的解析状态，供前端轮询：parsing | ready | error
+const parseStatus = new Map();
+
+export const getParseStatus = (filePath) => parseStatus.get(filePath) || "idle";
+
 const buildVectorStore = async (filePath) => {
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -30,19 +35,27 @@ const buildVectorStore = async (filePath) => {
     return vectorStore;
 };
 
-const getVectorStore = (filePath) => {
+// 导出供上传后预热使用：提前触发构建，后续 /chat 直接命中缓存。
+export const getVectorStore = (filePath) => {
     if (!vectorStoreCache.has(filePath)) {
-        const promise = buildVectorStore(filePath).catch((err) => {
-            // 构建失败时清掉缓存，下次请求可以重试
-            vectorStoreCache.delete(filePath);
-            throw err;
-        });
+        parseStatus.set(filePath, "parsing");
+        const promise = buildVectorStore(filePath)
+            .then((vectorStore) => {
+                parseStatus.set(filePath, "ready");
+                return vectorStore;
+            })
+            .catch((err) => {
+                // 构建失败时清掉缓存，下次请求可以重试
+                parseStatus.set(filePath, "error");
+                vectorStoreCache.delete(filePath);
+                throw err;
+            });
         vectorStoreCache.set(filePath, promise);
     }
     return vectorStoreCache.get(filePath);
 };
 
-const chat = async (query, filePath = "./uploads/hbs-lean-startup.pdf") => {
+const runChat = async (query, filePath) => {
     const apiKey = process.env.OPENAI_API_KEY;
 
     const vectorStore = await getVectorStore(filePath);
@@ -81,6 +94,23 @@ Helpful Answer:`;
     console.timeEnd("llm-invoke");
 
     return { text: response.content };
+};
+
+// 在途去重：相同 question+filePath 的并发请求共享同一个 Promise，
+// 避免反复点击触发重复的 embedding + LLM 调用。请求结束后清除 key。
+const inFlight = new Map();
+
+const chat = (query, filePath = "./uploads/hbs-lean-startup.pdf") => {
+    const key = `${filePath}::${query}`;
+    if (inFlight.has(key)) {
+        console.log("dedup hit:", key);
+        return inFlight.get(key);
+    }
+    const promise = runChat(query, filePath).finally(() => {
+        inFlight.delete(key);
+    });
+    inFlight.set(key, promise);
+    return promise;
 };
 
 export default chat;

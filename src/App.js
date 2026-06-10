@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import axios from "axios";
 import PdfUploader from "./components/PdfUploader";
 import ChatComponent from "./components/ChatComponent";
 import RenderQA from "./components/RenderQA";
-import { Layout, Typography } from "antd";
+import { Layout, Typography, Alert } from "antd";
+
+const DOMAIN = "http://localhost:5001";
 
 const chatComponentStyle = {
   position: "fixed",
@@ -25,12 +28,42 @@ const renderQAStyle = {
 const App = () => {
   const [conversation, setConversation] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [parseStatus, setParseStatus] = useState("idle");
+  const pollRef = useRef(null);
   const { Header, Content } = Layout;
   const { Title } = Typography;
 
   const handleResp = (question, answer) => {
      setConversation((prev) => [...prev, { question, answer }]);
   };
+
+  // 上传成功后开始轮询解析状态，直到 ready 或 error 才停止
+  // （即使用户中途提问也继续轮询，让用户清楚看到何时解析完成）
+  const startStatusPolling = () => {
+    setParseStatus("parsing");
+    if (pollRef.current) return;
+    pollRef.current = setInterval(async () => {
+      try {
+        const { data } = await axios.get(`${DOMAIN}/status`);
+        setParseStatus(data.status);
+        if (data.status === "ready" || data.status === "error") {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch (err) {
+        console.error(`status poll error: ${err}`);
+      }
+    }, 1500);
+  };
+
+  // 组件卸载时清理定时器
+  useEffect(() => () => clearInterval(pollRef.current), []);
+
+  const statusBanner = {
+    parsing: { type: "info", message: "Parsing document…" },
+    ready: { type: "success", message: "Document ready — ask away!" },
+    error: { type: "error", message: "Parsing failed. Please try uploading again." },
+  }[parseStatus];
 
   return (
     <>
@@ -45,8 +78,18 @@ const App = () => {
         </Header>
         <Content style={{ width: "80%", margin: "auto" }}>
           <div style={pdfUploaderStyle}>
-            <PdfUploader />
+            <PdfUploader onParseStart={startStatusPolling} />
           </div>
+
+          {statusBanner && (
+            <Alert
+              style={{ marginTop: "16px" }}
+              type={statusBanner.type}
+              message={statusBanner.message}
+              showIcon
+              banner
+            />
+          )}
 
           <br />
           <br />

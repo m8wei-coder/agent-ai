@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer"; // Import multer
 import { ProxyAgent, setGlobalDispatcher } from "undici";
-import chat from "./chat.js";
+import chat, { getVectorStore, getParseStatus } from "./chat.js";
 
 dotenv.config();
 
@@ -36,7 +36,19 @@ let filePath;
 
 app.post("/upload", upload.single("file"), (req, res) => {
     filePath = req.file.path;
+
+    // 上传成功后立刻在后台预热：解析 PDF + 构建 embedding 缓存。
+    // 不 await，先把响应返回给用户；等用户打完字发问时，构建通常已完成。
+    getVectorStore(filePath).catch((err) => {
+        console.error("warmup failed:", err.message);
+    });
+
     res.send(filePath + " uploaded successfully");
+});
+
+// 前端轮询解析状态：idle | parsing | ready | error
+app.get("/status", (req, res) => {
+    res.send({ status: filePath ? getParseStatus(filePath) : "idle" });
 });
 
 app.get("/chat", async (req, res) => {
