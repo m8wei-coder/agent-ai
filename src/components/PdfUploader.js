@@ -52,8 +52,8 @@ const PdfUploader = ({ onParseStart }) => {
         <Dragger {...attributes}>
             <p className="ant-upload-drag-icon">
                 <InboxOutlined />
-                <p>click or drag file to this area to upload</p>
             </p>
+            <p className="ant-upload-text">click or drag file to this area to upload</p>
         </Dragger>
     );
 };

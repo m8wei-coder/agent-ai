@@ -33,8 +33,38 @@ const App = () => {
   const { Header, Content } = Layout;
   const { Title } = Typography;
 
-  const handleResp = (question, answer) => {
-     setConversation((prev) => [...prev, { question, answer }]);
+  // 流式：提问时先压入一条空回答的气泡
+  const handleStart = (question) => {
+    setConversation((prev) => [
+      ...prev,
+      { question, answer: { ragAnswer: "", mcpAnswer: "N/A" } },
+    ]);
+  };
+
+  // 流式：每收到一段 token，就追加到最后一条回答上
+  const handleDelta = (delta) => {
+    setConversation((prev) => {
+      const next = [...prev];
+      const last = next[next.length - 1];
+      next[next.length - 1] = {
+        ...last,
+        answer: { ...last.answer, ragAnswer: last.answer.ragAnswer + delta },
+      };
+      return next;
+    });
+  };
+
+  // 出错时把错误写进最后一条回答
+  const handleError = (msg) => {
+    setConversation((prev) => {
+      const next = [...prev];
+      const last = next[next.length - 1];
+      next[next.length - 1] = {
+        ...last,
+        answer: { ...last.answer, ragAnswer: `Error: ${msg}` },
+      };
+      return next;
+    });
   };
 
   // 上传成功后开始轮询解析状态，直到 ready 或 error 才停止
@@ -102,7 +132,9 @@ const App = () => {
         </Content>
         <div style={chatComponentStyle}>
           <ChatComponent
-            handleResp={handleResp}
+            onStart={handleStart}
+            onDelta={handleDelta}
+            onError={handleError}
             isLoading={isLoading}
             setIsLoading={setIsLoading}
           />

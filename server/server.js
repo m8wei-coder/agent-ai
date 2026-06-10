@@ -6,7 +6,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
-import chat, { getVectorStore, getParseStatus } from "./chat.js";
+import { chatStream, getVectorStore, getParseStatus } from "./chat.js";
 
 dotenv.config();
 
@@ -58,16 +58,22 @@ app.get("/status", (req, res) => {
 });
 
 app.get("/chat", async (req, res) => {
-    try {
-        const resp = await chat(req.query.question, filePath);
+    // 以 SSE 流式返回：逐 token 推送 { delta }，结束发 { done }，出错发 { error }。
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
 
-        res.send({
-            ragAnswer: resp.text,
-            mcpAnser: "N/A",
-        });
+    try {
+        for await (const delta of chatStream(req.query.question, filePath)) {
+            res.write(`data: ${JSON.stringify({ delta })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     } catch (err) {
         console.error("chat error:", err);
-        res.status(500).send({ error: err.message });
+        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    } finally {
+        res.end();
     }
 });
 
