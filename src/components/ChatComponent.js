@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; // Import useState
+import React, { useState, useEffect, useRef } from "react"; // Import useState
 import { Button, Input } from "antd";
 import { AudioOutlined } from "@ant-design/icons";
 import SpeechRecognition, {
@@ -23,14 +23,13 @@ const ChatComponent = (props) => {
   const [isChatModeOn, setIsChatModeOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [speech, setSpeech] = useState();
+  const onSearchRef = useRef(null);
 
   // speech recognation
   const {
     transcript,
     listening,
     resetTranscript,
-    browserSupportsSpeechRecognition,
-    isMicrophoneAvailable,
   } = useSpeechRecognition();
 
   useEffect(() => {
@@ -55,16 +54,6 @@ const ChatComponent = (props) => {
         console.error(`Error initializing speech: ${error}`);
       });
   }, []);
-
-  useEffect(() => {
-    if (!listening && Boolean(transcript)) {
-      // 用户说完、开始解析这句话时，把按钮从 "Recording..." 切回 "Click to record"
-      setIsRecording(false);
-      (async () => {
-        await onSearch(transcript);
-      })(); // IIFE
-    }
-  }, [listening, transcript]);
 
   const talk = (what2say) => {
     speech
@@ -191,6 +180,18 @@ const ChatComponent = (props) => {
       streamDone = true;
     }
   };
+
+  onSearchRef.current = onSearch;
+
+  useEffect(() => {
+    if (!listening && Boolean(transcript)) {
+      // 用户说完、开始解析这句话时，把按钮从 "Recording..." 切回 "Click to record"
+      setIsRecording(false);
+      (async () => {
+        await onSearchRef.current?.(transcript);
+      })(); // IIFE
+    }
+  }, [listening, transcript]);
 
   const handleChange = (e) => {
     // Update searchValue state when the user types in the input box

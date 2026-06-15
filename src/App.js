@@ -37,7 +37,7 @@ const App = () => {
   const handleStart = (question) => {
     setConversation((prev) => [
       ...prev,
-      { question, answer: { ragAnswer: "", mcpAnswer: "N/A" } },
+      { question, answer: "" },
     ]);
   };
 
@@ -48,7 +48,7 @@ const App = () => {
       const last = next[next.length - 1];
       next[next.length - 1] = {
         ...last,
-        answer: { ...last.answer, ragAnswer: last.answer.ragAnswer + delta },
+        answer: last.answer + delta,
       };
       return next;
     });
@@ -61,7 +61,7 @@ const App = () => {
       const last = next[next.length - 1];
       next[next.length - 1] = {
         ...last,
-        answer: { ...last.answer, ragAnswer: `Error: ${msg}` },
+        answer: `Error: ${msg}`,
       };
       return next;
     });
